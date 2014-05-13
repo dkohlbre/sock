@@ -11,6 +11,9 @@ __all__ = "Sock Sock6 toSock SockU SockU6 toSockU Timeout SocketError".split()
 DEFAULT_TIMEOUT = 5
 PORT_REGEXP = re.compile(r"(:| |;|/|\|)+(?P<port>\d+)$")
 
+SOCKLOG_SEND = "[SLS] "
+SOCKLOG_RECV = "[SLR] "
+
 '''
 TODO:
 - update README (sockU)
@@ -81,6 +84,10 @@ class AbstractSock(object):
 
         # python2 does not allow (*args, timeout=None) :(
         self.timeout = float(timeout_dict.pop("timeout", DEFAULT_TIMEOUT))
+
+        self.logging_send = bool(timeout_dict.pop("log_send", False))
+        self.logging_recv = bool(timeout_dict.pop("log_recv", False))
+
         if timeout_dict:
             raise TypeError("Only timeout should be given through keyword args")
 
@@ -101,8 +108,20 @@ class AbstractSock(object):
     def send(self):
         return NotImplemented
 
+    def _send(self,data):
+        if self.logging_send:
+            for line in data.split("\n"):
+                print SOCKLOG_SEND + line
+        self.send(data)
+
+    def _log_recv(self,data):
+        if self.logging_recv:
+            for line in data.split("\n"):
+                print SOCKLOG_RECV + line
+        return data
+
     def send_line(self, line):
-        return self.send(line + "\n")
+        return self._send(line + "\n")
 
     def read_line(self, timeout=None):
         return self.read_until("\n", timeout=timeout)
@@ -119,7 +138,7 @@ class AbstractSock(object):
             raise EOFError("Connection closed")
         res = self.buf
         self.buf = ""
-        return res
+        return self._log_recv(res)
 
     def read_all(self, timeout=None):
         """
@@ -128,7 +147,7 @@ class AbstractSock(object):
         self.read_cond(lambda x: x.eof, timeout)
         res = self.buf
         self.buf = ""
-        return res
+        return self._log_recv(res)
 
     def skip_until(self, s, timeout=None):
         """
@@ -136,6 +155,7 @@ class AbstractSock(object):
         Return nothing.
         """
         self.read_cond(lambda x: s in x.buf, timeout)
+        self._log_recv(self.buf)
         start = self.buf.find(s)
         self.buf = self.buf[start:]
         return
@@ -146,6 +166,7 @@ class AbstractSock(object):
         Return match.
         """
         match = self.read_cond(lambda x: re.search(r, x.buf), timeout)
+        self._log_recv(self.buf)
         self.buf = self.buf[match.start():]
         return match
 
@@ -158,7 +179,7 @@ class AbstractSock(object):
         end = self.buf.find(s) + len(s)
         res = self.buf[:end]
         self.buf = self.buf[end:]
-        return res
+        return self._log_recv(res)
 
     def read_until_re(self, r, timeout=None):
         """
@@ -170,12 +191,12 @@ class AbstractSock(object):
         """
         match = self.read_cond(lambda x: re.search(r, x.buf), timeout)
         self.buf = self.buf[match.end():]
-        return match
+        return self._log_recv(match)
 
     def read_nbytes(self, n, timeout=None):
         self.read_cond(lambda x: len(x.buf) >= n, timeout)
         self.buf, res = self.buf[n:], self.buf[:n]
-        return res
+        return self._log_recv(res)
 
     def read_cond(self, cond, timeout=None):
         """
@@ -258,7 +279,7 @@ class AbstractSock(object):
         return self.sock.fileno()
 
     def write(self, s):
-        return self.send(s)
+        return self._send(s)
 
     def shut_wr(self):
         self.sock.shutdown(socket.SHUT_WR)

@@ -13,7 +13,7 @@ Usage
 ```python
 from sock import *
 
-f = Sock("some.cool.servi.ce:3123", timeout=10)
+f = Sock("some.cool.servi.ce:3123", timeout=10, log_send=False, log_recv=True)
 # or IPv6
 f = Sock6("::1 3123", timeout=3)
 # or already existing socket
@@ -53,5 +53,6 @@ About
 This software uses Semantic Versioning ( http://semver.org/ )
 
 Author: hellman ( hellman1908@gmail.com )
+Fork: dkohlbre (dkohlbre@cs.ucsd.edu)
 
 License: MIT License (http://opensource.org/licenses/MIT)
